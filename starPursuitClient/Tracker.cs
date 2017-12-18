@@ -1,16 +1,9 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-namespace starPursuitShared
+﻿namespace starPursuitClient
 {
-    [Serializable]
     public class Tracker
     {
         public int TrackerID { get; set; }
-        public int entity { get; set; }
-        public bool ai { get; set; }
+        public int Entity { get; set; }
+        public bool Ai { get; set; }
     }
 }

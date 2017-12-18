@@ -1,27 +1,66 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
-using starPursuitShared;
 using CitizenFX.Core;
 using static CitizenFX.Core.Native.API;
 
 namespace starPursuitClient
 {
-    public class StarPursuitClient: BaseScript
+    public class starPursuitClient: BaseScript
     {
         List<Tracker> trackers = new List<Tracker>();
         Tracker currentTracker;
         List<Blip> blipPool = new List<Blip>();
         bool isTracking = false;
+        bool timeOut = false;
 
-        public StarPursuitClient()
+        public starPursuitClient()
         {
             Tick += OnTick;
-            EventHandlers.Add("cop:lTrackers", new Action(LTrackers));
-            EventHandlers.Add("cop:dTracker", new Action<int>(DTracker));
-            EventHandlers.Add("cop:cTrackers", new Action(CTrackers));
-            EventHandlers.Add("cop:eTracker", new Action<int>(ETracker));
-            EventHandlers.Add("cop:cTracker", new Action<int>(CTracker));
+            RegisterCommand("etracker", new Action<int, List<dynamic>, string>((source, args, rawCommand) => { ETrackerC(source, args, rawCommand); }), false);
+            RegisterCommand("dtracker", new Action<int, List<dynamic>, string>((source, args, rawCommand) => { DTrackerC(source, args, rawCommand); }), false);
+            RegisterCommand("ctracker", new Action<int, List<dynamic>, string>((source, args, rawCommand) => { CTrackerC(source, args, rawCommand); }), false);
+            RegisterCommand("ctrackers", new Action<int, List<dynamic>, string>((source, args, rawCommand) => { CTrackersC(source, args, rawCommand); }), false);
+            RegisterCommand("ltrackers", new Action<int, List<dynamic>, string>((source, args, rawCommand) => { LTrackersC(source, args, rawCommand); }), false);
+        }
+
+        private void ETrackerC(int sourceID, List<dynamic> args, string rawCommand)
+        {
+            if(args.Count == 1)
+            {
+                ETracker(Convert.ToInt32(args[0]));
+            }
+            else
+            {
+                TriggerEvent("chatMessage", "Star Pursuit", new[] { 255, 0, 0 }, "Invalid Syntax, use: /etracker <Tracker ID>");
+            }
+        }
+
+        private void DTrackerC(int sourceID, List<dynamic> args, string rawCommand)
+        {
+            DTracker();
+        }
+
+        private void CTrackerC(int sourceID, List<dynamic> args, string rawCommand)
+        {
+            if (args.Count == 1)
+            {
+                CTracker(Convert.ToInt32(args[0]));
+            }
+            else
+            {
+                TriggerEvent("chatMessage", "Star Pursuit", new[] { 255, 0, 0 }, "Invalid Syntax, use: /etracker <Tracker ID>");
+            }
+        }
+
+        private void CTrackersC(int sourceID, List<dynamic> args, string rawCommand)
+        {
+            CTrackers();
+        }
+
+        private void LTrackersC(int sourceID, List<dynamic> args, string rawCommand)
+        {
+            LTrackers();
         }
 
         private void CTracker(int trackerID)
@@ -31,8 +70,8 @@ namespace starPursuitClient
                 TriggerEvent("chatMessage", "Star Pursuit", new[] { 255, 0, 0 }, "Deleted Tracker #" + GetTrackerFromID(trackerID).TrackerID);
                 if (isTracking && currentTracker == GetTrackerFromID(trackerID))
                     CFTrackers();
-                int entity = GetTrackerFromID(trackerID).entity;
-                if (GetTrackerFromID(trackerID).ai)
+                int entity = GetTrackerFromID(trackerID).Entity;
+                if (GetTrackerFromID(trackerID).Ai)
                     SetEntityAsNoLongerNeeded(ref entity);
                 trackers.Remove(GetTrackerFromID(trackerID));
             }
@@ -45,7 +84,7 @@ namespace starPursuitClient
         {
             if (GetTrackerFromID(trackerID) != null)
             {
-                ATracker(GetTrackerFromID(trackerID).entity, GetTrackerFromID(trackerID).TrackerID);
+                ATracker(GetTrackerFromID(trackerID).Entity, GetTrackerFromID(trackerID).TrackerID);
                 TriggerEvent("chatMessage", "Star Pursuit", new[] { 255, 0, 0 }, "Attached to Tracker #" + GetTrackerFromID(trackerID).TrackerID);
             }
             else
@@ -63,16 +102,17 @@ namespace starPursuitClient
             TriggerEvent("chatMessage", "Star Pursuit", new[] { 255, 0, 0 }, "Deleted All Trackers");
         }
 
-        private void DTracker(int trackerID)
+        private void DTracker()
         {
-            if (GetTrackerFromID(trackerID) != null)
+            if (currentTracker != null)
             {
+                TriggerEvent("chatMessage", "Star Pursuit", new[] { 255, 0, 0 }, "Detached from Tracker #" + currentTracker.TrackerID);
                 CFTrackers();
-                TriggerEvent("chatMessage", "Star Pursuit", new[] { 255, 0, 0 }, "Detached from Tracker #" + GetTrackerFromID(trackerID).TrackerID);
             }
             else
-                TriggerEvent("chatMessage", "Star Pursuit", new[] { 255, 0, 0 }, "Invalid Tracker ID");
-            return;
+            {
+                TriggerEvent("chatMessage", "Star Pursuit", new[] { 255, 0, 0 }, "Not attached to any Trackers!");
+            }
         }
 
         private void LTrackers()
@@ -143,10 +183,27 @@ namespace starPursuitClient
             return trackerToReturn;
         }
 
+        private bool IsTracked(int entity)
+        {
+            foreach(Tracker tracker in trackers)
+            {
+                if (tracker.Entity == entity)
+                    return true;
+            }
+            return false;
+        }
+
+        private async void DeployTimer()
+        {
+            timeOut = true;
+            await Delay(1000);
+            timeOut = false;
+        }
+
         private async Task OnTick()
         {
-            await Delay(500);
-            if (IsControlPressed(1, 37) && IsPedSittingInAnyVehicle(GetPlayerPed(PlayerId())) && GetVehicleClass(GetVehiclePedIsIn(GetPlayerPed(PlayerId()), false)) == 18)
+            await Delay(1);
+            if (IsControlPressed(1, 37) && IsPedSittingInAnyVehicle(GetPlayerPed(PlayerId())) && GetVehicleClass(GetVehiclePedIsIn(GetPlayerPed(PlayerId()), false)) == 18 && !timeOut)
             {
                 Vector3 ForwardPosition = GetOffsetFromEntityInWorldCoords(GetVehiclePedIsIn(GetPlayerPed(PlayerId()), false), 0, 30, 0);
                 int player = GetPlayerPed(PlayerId());
@@ -158,20 +215,28 @@ namespace starPursuitClient
                 int entity = 0;
                 GetRaycastResult(rayCastPoint, ref hit, ref endCoords, ref surfaceNormal, ref entity);
                 GetEntityPlayerIsFreeAimingAt(PlayerId(), ref entity);
+                DeployTimer();
                 if (entity != 0)
                 {
-                    Tracker newTracker = new Tracker
+                    if (!IsTracked(entity))
                     {
-                        entity = entity,
-                        TrackerID = trackers.Count
-                    };
-                    if (!IsPedAPlayer(GetPedInVehicleSeat(entity, -1)))
-                    {
-                        SetEntityAsMissionEntity(entity, true, true);
-                        newTracker.ai = true;
+                        Tracker newTracker = new Tracker
+                        {
+                            Entity = entity,
+                            TrackerID = trackers.Count
+                        };
+                        if (!IsPedAPlayer(GetPedInVehicleSeat(entity, -1)))
+                        {
+                            SetEntityAsMissionEntity(entity, true, true);
+                            newTracker.Ai = true;
+                        }
+                        trackers.Add(newTracker);
+                        ETracker(newTracker.TrackerID);
                     }
-                    trackers.Add(newTracker);
-                    ETracker(newTracker.TrackerID);                    
+                    else
+                    {
+                        TriggerEvent("chatMessage", "Star Pursuit", new[] { 255, 0, 0 }, "This vehicle is already being tracked!");
+                    }
                 }
             }
         }
