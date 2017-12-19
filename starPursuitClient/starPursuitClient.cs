@@ -22,6 +22,16 @@ namespace starPursuitClient
             RegisterCommand("ctracker", new Action<int, List<dynamic>, string>((source, args, rawCommand) => { CTrackerC(source, args, rawCommand); }), false);
             RegisterCommand("ctrackers", new Action<int, List<dynamic>, string>((source, args, rawCommand) => { CTrackersC(source, args, rawCommand); }), false);
             RegisterCommand("ltrackers", new Action<int, List<dynamic>, string>((source, args, rawCommand) => { LTrackersC(source, args, rawCommand); }), false);
+#if DEBUG
+            RegisterCommand("trin", new Action<int, List<dynamic>, string>((source, args, rawCommand) => { Trin(source, args, rawCommand); }), false);
+#endif
+        }
+
+        private void Trin(int sourceID, List<dynamic> args, string rawCommand)
+        {
+            TriggerEvent("chatMessage", "Star Pursuit", new[] { 255, 0, 0 }, "Entity: "+currentTracker.Entity);
+            TriggerEvent("chatMessage", "Star Pursuit", new[] { 255, 0, 0 }, "Is AI: " + currentTracker.Ai);
+            TriggerEvent("chatMessage", "Star Pursuit", new[] { 255, 0, 0 }, "Exists: " + DoesEntityExist(currentTracker.Entity));
         }
 
         private void ETrackerC(int sourceID, List<dynamic> args, string rawCommand)
@@ -84,7 +94,7 @@ namespace starPursuitClient
         {
             if (GetTrackerFromID(trackerID) != null)
             {
-                ATracker(GetTrackerFromID(trackerID).Entity, GetTrackerFromID(trackerID).TrackerID);
+                ATracker(GetTrackerFromID(trackerID));
                 TriggerEvent("chatMessage", "Star Pursuit", new[] { 255, 0, 0 }, "Attached to Tracker #" + GetTrackerFromID(trackerID).TrackerID);
             }
             else
@@ -133,32 +143,32 @@ namespace starPursuitClient
             currentTracker = null;
         }
 
-        private void ATracker(int entity, int id)
+        private void ATracker(Tracker tracker)
         {            
             ClearBlips();
-            Vector3 tracker = GetEntityCoords(entity, true);
-            Blip blip = new Blip(AddBlipForCoord(tracker.X, tracker.Y, tracker.Z))
+            Vector3 trackerPos = GetEntityCoords(tracker.Entity, true);
+            Blip blip = new Blip(AddBlipForCoord(trackerPos.X, trackerPos.Y, trackerPos.Z))
             {
                 Color = BlipColor.Blue,
-                Name = "Tracker #" + id
+                Name = "Tracker #" + tracker.TrackerID
             };
             SetBlipRoute(blip.Handle, true);
             blipPool.Add(blip);
             isTracking = true;
-            currentTracker = GetTrackerFromID(id);
-            UpdatePositions(blip, entity, id);
+            currentTracker = tracker;
+            UpdatePositions(blip, tracker);
         }
 
-        private async void UpdatePositions(Blip blip, int tracker, int id)
+        private async void UpdatePositions(Blip blip, Tracker tracker)
         {
             while (isTracking)
             {
                 await Delay(500);
-                if (DoesEntityExist(tracker) && isTracking)
+                if (DoesEntityExist(tracker.Entity) && isTracking)
                 {
-                    Vector3 entityPosition = GetEntityCoords(tracker, true);
+                    Vector3 entityPosition = GetEntityCoords(tracker.Entity, true);
                     blip.Position = entityPosition;
-                    SetBlipRoute(blip.Handle, true);                    
+                    SetBlipRoute(blip.Handle, true);
                 }                    
             }
         }
@@ -229,6 +239,10 @@ namespace starPursuitClient
                         {
                             SetEntityAsMissionEntity(entity, true, true);
                             newTracker.Ai = true;
+                        }
+                        else
+                        {
+                            //TriggerEvent("chatMessage", "Star Pursuit", new[] { 255, 0, 0 }, "Network ID: "+NetworkGetEntityIsNetworked(entity));
                         }
                         trackers.Add(newTracker);
                         ETracker(newTracker.TrackerID);
